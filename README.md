@@ -1,19 +1,112 @@
-## Multi-Dimensional Neural Network
+# Multi-Dimensional Neural Network (MDNN)
 
-The idea for this network architecture is to have each node/neuron be a vector in 3D space where the weight is inversely proportional to the distance between two neurons. The hope is that by only calculating neurons within a specified distance, we can reduce computational overhead and lower the memory required for a model's use.
+**MDNN** is an experimental C++ neural-network architecture where every neuron is a point in 3-D space.
+Connection weights are defined as **1 / distance** between neurons, so physically closer neurons interact more strongly.
+By restricting computation to neighbours within a configurable radius, MDNN aims to:
 
-### Basic Implementation
-  * The compiler I used was G++.
-  * There should be no external dependencies.
-  * Using the network should look something like this:
-  * The number of inputs needs to be specified before compile in MDNN.cpp.
-  * ```cpp
+* **Lower computational cost** – skip distant pairs entirely.
+* **Reduce memory footprint** – store or load only active clusters.
+* **Encourage locality** – specialised subnetworks form naturally.
+
+---
+
+## ✨ Current Feature Set
+
+| Status | Module                     | Notes                                                  |
+| :----: | -------------------------- | ------------------------------------------------------ |
+|    ✅   | **Vector-Space Grid**      | Spatial hash with radius & k-nearest search            |
+|    ✅   | **Forward Cascade**        | Propagates inputs through fired neurons only           |
+|    ✅   | **Back-prop Skeleton**     | Gradients flow along the same fired path               |
+|    ✅   | **Evolution Engine**       | `network` class supports generations & mutation copies |
+|   🛠️  | **Neuron-Wiggle**          | Fine-tunes only recently-fired neurons *(in progress)* |
+|   🛠️  | **Smart-Pointer Refactor** | Replacing raw pointers with `std::unique_ptr`          |
+|   🛠️  | **Error Convergence**      | Training currently plateaus – needs tuning             |
+
+---
+
+## 🔧 Build Instructions
+
+* **Compiler** : *GNU Compiler Collection* **(GCC)** C++ frontend
+* **Standard** : C++20
+* **Dependencies** : none (uses only the C++ Standard Library)
+
+```bash
+# from project root
+g++ -std=c++20 -O3 *.cpp -o mdnn
+```
+
+> Using MSVC or Clang? Enable full C++20 support and `std::chrono` extensions.
+
+---
+
+## 🚀 Quick Start
+
+```cpp
+#include "MDNN.h"
+
+int main() {
     MDNN nn;
-    nn.cascade(data);
-    nn.clearNeurons();
-    nn.back_propagation(training_data);
-    ```
 
-### Progress
-  * The network currently forward and backward propagates, but the implementation of training is not reducing the error properly.
-  * It still needs a lot of work. Feel free to message me with questions.
+    std::vector<float> input = /* your normalised sample */;
+    nn.cascade(input);            // forward pass
+
+    nn.reset();            // reset fired flags
+}
+```
+
+### Compile-time Constants
+
+| Constant              | Location         | Purpose                  |
+| --------------------- | ---------------- | ------------------------ |
+| `inputs`              | `MDNN.cpp`       | Total input nodes        |
+| `CELL_SIZE`, `RADIUS`, `vector_space_range` | `vector_space.h` | Spatial grid granularity |
+
+---
+
+## 🗄️ Repository Layout
+
+```
+z_MDNN.h           core network logic
+vector_space.h     spatial hash + distance helpers
+train.h            GA wrapper (generations / mutation)
+main.cpp           CLI front-end: “train -g 1000 -p 500 …”
+run.h              Testing wrapper for trained networks.
+hashKey.h          128-bit key for grid buckets and node struct.
+README.md          you are here
+```
+
+---
+
+## 📈 Project Status <small>(7 May 2025)</small>
+
+* Will progress through generations reducing error.
+* Error reduces but output is not changing over varied inputs.
+
+---
+
+## 🛣️ Roadmap
+
+1. Finalise **Proper Cascade** evolutionary fine-tuning.
+2. Optimize GA training.
+3. Refactor pointers.
+4. Benchmark against dense MLP on MNIST & CIFAR-10.
+5. Optional Python bindings via **pybind11** for rapid experimentation.
+
+---
+
+## 🤝 Contributing
+
+Issues, pull requests, and design critiques are welcome!
+For significant changes, please open an issue first to discuss your ideas.
+
+---
+
+## 📜 License
+
+Released under the **MIT License** – see `LICENSE` for details.
+
+---
+
+## ✉️ Contact
+
+Daniel Mergenthal • open an issue or ping **@Dan-MDNN** on GitHub.

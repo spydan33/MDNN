@@ -149,6 +149,8 @@ void showHelp(const vector<string>& args)
              << "  -k               Number of population winners to keep per generation\n"
              << "  -i               Number of images to train on per generation\n"
              << "  -n               Network file to load/save for backpropagation\n"
+             << "  -l, --learning-rate  Learning rate for backpropagation\n"
+             << "  -e, --epochs        Number of passes over the training data\n"
              << "  --backpropagation  Use backpropagation instead of the genetic algorithm\n"
              << "  --standard  use standard for dev and save time\n";
     }
@@ -275,6 +277,8 @@ void handleTrain(const vector<string>& args)
     string data_url = "";
     bool use_backpropagation = false;
     string network_file = "";
+    int epochs = 1;
+    float learning_rate = 0.001f;
 
     for (size_t i = 1; i < args.size(); ++i)
     {
@@ -306,6 +310,14 @@ void handleTrain(const vector<string>& args)
         {
             network_file = args[++i];
         }
+        else if ((args[i] == "-l" || args[i] == "--learning-rate") && i + 1 < args.size())
+        {
+            learning_rate = stof(args[++i]);
+        }
+        else if ((args[i] == "-e" || args[i] == "--epochs") && i + 1 < args.size())
+        {
+            epochs = stoi(args[++i]);
+        }
         else if (args[i] == "--backpropagation")
         {
             use_backpropagation = true;
@@ -328,12 +340,15 @@ void handleTrain(const vector<string>& args)
          << "  Mutation rate: " << trainer.mutation_rate << "\n"
          << "  Generations: " << trainer.num_generations << "\n"
          << "  Data URL: " << data_url << "\n"
+         << "  Learning rate: " << learning_rate << "\n"
+         << "  Epochs: " << epochs << "\n"
          << "  Using backpropagation: " << (use_backpropagation ? "Yes" : "No") << "\n";
 
     // Call your training logic here
     if (use_backpropagation)
     {
         MDNN nn = network_file.empty() ? MDNN(1000, "backprop_vectorspace", 0) : MDNN(network_file);
+        nn.set_learning_rate(learning_rate);
         try
         {
             MNISTImageReader image_reader("train-images.idx3-ubyte");
@@ -341,11 +356,14 @@ void handleTrain(const vector<string>& args)
             MNISTLabelReader label_reader("train-labels.idx1-ubyte");
             auto one_hot_labels = label_reader.getOneHotLabels();
             int limit = min<int>(trainer.itteration_per_population, images.size());
-            for (int i = 0; i < limit; ++i)
+            for (int epoch = 0; epoch < epochs; ++epoch)
             {
-                nn.cascade(images[i].pixels);
-                nn.back_propagation(one_hot_labels[i]);
-                nn.reset();
+                for (int i = 0; i < limit; ++i)
+                {
+                    nn.cascade(images[i].pixels);
+                    nn.back_propagation(one_hot_labels[i]);
+                    nn.reset();
+                }
             }
             nn.save();
             cout << "Backpropagation training complete.\n";

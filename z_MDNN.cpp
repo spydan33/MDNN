@@ -199,137 +199,57 @@ class MDNN
             }
             return (sum / expected_output.size());
         }
-        void back_propagation(vector<float> expected_output)
+        void back_propagation(std::vector<float> expected_output)
         {
-            float loss = calc_loss(expected_output); // Calculate loss once before the loop
-            float decay_factor = 0.00001f;
-            float new_learning_rate = abs(learning_rate * loss);
-            // Calculate the variable learning rate
-            if(nodes_fired.size() == 0)
+            // Basic mean squared error gradient descent on the output nodes.
+            if (output_nodes.size() != expected_output.size())
             {
-                cout << "zero fired! \n";
-                vector<node *> new_nodes = vs.get_all();
-                for (int i = outputs_num; i < new_nodes.size(); i++)
-                {
-                    vector<node *> last_layer = vs.radius_search_all(new_nodes[i]);
-                    vector<float> grad_weight_pos_vec_sum(3, 0.0); // Initialize with zero
-
-                    float node_output = new_nodes[i]->value; // Get the output of the firing node
-
-                    for (node* last_node : last_layer)
-                    {
-                        float distance = vs.get_distance(new_nodes[i], last_node);
-                        if (distance == 0) continue; // Skip zero distance to avoid division by zero
-
-                        float weight = ((1 / (distance)) * new_nodes[i]->s);
-                        new_nodes[i]->used = true;
-
-                        // Calculate the gradient vector component-wise
-                        vector<float> grad_weight_pos_vec = {
-                            loss * new_learning_rate * (-(new_nodes[i]->x - last_node->x) / (distance * distance * distance + 1e-8f)),
-                            loss * new_learning_rate * (-(new_nodes[i]->y - last_node->y) / (distance * distance * distance + 1e-8f)),
-                            loss * new_learning_rate * (-(new_nodes[i]->z - last_node->z) / (distance * distance * distance + 1e-8f)),
-                            loss * new_learning_rate * (-(nodes_fired[i]->bias + last_node->bias))
-                        };
-
-                        grad_weight_pos_vec_sum[0] += (grad_weight_pos_vec[0] * not_zero(grad_weight_pos_vec_sum[0]));
-                        grad_weight_pos_vec_sum[1] += (grad_weight_pos_vec[1] * not_zero(grad_weight_pos_vec_sum[1]));
-                        grad_weight_pos_vec_sum[2] += (grad_weight_pos_vec[2] * not_zero(grad_weight_pos_vec_sum[2]));
-                    }
-                    if(i % 10 == 0 && verbose)
-                    {
-                        cout << "grad: [" << grad_weight_pos_vec_sum[0] << "," << grad_weight_pos_vec_sum[2] << "," << grad_weight_pos_vec_sum[3] << "," << "] \n";
-                    }
-                    
-                    // Update biases and weights with the computed gradients
-                    new_nodes[i]->bias -= new_learning_rate; // Bias update
-                    new_nodes[i]->x -= grad_weight_pos_vec_sum[0] * new_learning_rate;
-                    new_nodes[i]->y -= grad_weight_pos_vec_sum[1] * new_learning_rate;
-                    new_nodes[i]->z -= grad_weight_pos_vec_sum[2] * new_learning_rate;
-
-                    new_nodes[i]->fired = false;
-                    new_nodes[i]->staged = false;
-                }
-                
-                for (int i = 0; i < 2000; i++)
-                {
-                    vs.add_vector();
-                }
-                
-                back_prop_iteration += 1;
+                return; // Mismatched data
             }
-            else
+
+            float loss = calc_loss(expected_output);
+
+            for (size_t i = 0; i < output_nodes.size(); ++i)
             {
-                for (int i = 0; i < nodes_fired.size(); i++)
+                node* out = output_nodes[i];
+                float error = output[i] - expected_output[i];
+
+                // Update bias directly using the error term
+                out->bias -= learning_rate * error;
+
+                // Adjust position based on neighbouring nodes
+                auto neighbours = vs.radius_search_all(out);
+                for (node* prev : neighbours)
                 {
-                    vector<node *> last_layer = vs.radius_search_all(nodes_fired[i]);
-                    vector<float> grad_weight_pos_vec_sum(4, 0.0); // Initialize with zero
-                    
-                
-                    for (node* last_node : last_layer)
-                    {
-                        
-                        float distance = vs.get_distance(nodes_fired[i], last_node);
-                        if (distance == 0) continue; // Skip zero distance to avoid division by zero
-                        float node_output = nodes_fired[i]->value; // Get the output of the firing node
-                        if(i < outputs_num)
-                        {
-                            nodes_fired[i]->bias -= loss * new_learning_rate * (-(nodes_fired[i]->bias + last_node->bias)) * learning_rate; // Bias update
-                            nodes_fired[i]->x -= nodes_fired[i]->s * loss * new_learning_rate * (-(nodes_fired[i]->x - last_node->x) / (distance * distance * distance + 1e-8f)),
-                            nodes_fired[i]->z -= nodes_fired[i]->s * loss * new_learning_rate * (-(nodes_fired[i]->y - last_node->y) / (distance * distance * distance + 1e-8f)),
-                            nodes_fired[i]->z -= nodes_fired[i]->s * loss * new_learning_rate * (-(nodes_fired[i]->z - last_node->z) / (distance * distance * distance + 1e-8f)),
+                    float distance = vs.get_distance(out, prev);
+                    if (distance == 0.0f) continue;
 
-                            nodes_fired[i]->fired = false;
-                            nodes_fired[i]->staged = false;
-                        }
-                        else
-                        {
-                            vector<float> grad_weight_pos_vec = {
-                            nodes_fired[i]->s * loss * new_learning_rate * (-(nodes_fired[i]->x - last_node->x) / (distance * distance * distance + 1e-8f)),
-                            nodes_fired[i]->s * loss * new_learning_rate * (-(nodes_fired[i]->y - last_node->y) / (distance * distance * distance + 1e-8f)),
-                            nodes_fired[i]->s * loss * new_learning_rate * (-(nodes_fired[i]->z - last_node->z) / (distance * distance * distance + 1e-8f)),
-                            loss * new_learning_rate * (-(nodes_fired[i]->bias + last_node->bias))
-                            };
+                    float weight_sign = out->s;
+                    float grad = error * prev->value * weight_sign / std::pow(distance, 3);
 
-                            grad_weight_pos_vec_sum[0] += (grad_weight_pos_vec[0] * not_zero(grad_weight_pos_vec_sum[0]));
-                            grad_weight_pos_vec_sum[1] += (grad_weight_pos_vec[1] * not_zero(grad_weight_pos_vec_sum[1]));
-                            grad_weight_pos_vec_sum[2] += (grad_weight_pos_vec[2] * not_zero(grad_weight_pos_vec_sum[2]));
-                            grad_weight_pos_vec_sum[3] += (grad_weight_pos_vec[3] * not_zero(grad_weight_pos_vec_sum[3]));
-                        
-
-                        
-                            if(i % 50 == 0 && verbose)
-                            {
-                                cout << "grad: [" << grad_weight_pos_vec_sum[0] << "," << grad_weight_pos_vec_sum[2] << "," << grad_weight_pos_vec_sum[3] << "," << "] \n";
-                            }
-                            // Update biases and weights with the computed gradients
-                            nodes_fired[i]->bias -= grad_weight_pos_vec_sum[3] * learning_rate; // Bias update
-                            nodes_fired[i]->x -= grad_weight_pos_vec_sum[0] * learning_rate;
-                            nodes_fired[i]->y -= grad_weight_pos_vec_sum[1] * learning_rate;
-                            nodes_fired[i]->z -= grad_weight_pos_vec_sum[2] * learning_rate;
-
-                            nodes_fired[i]->fired = false;
-                            nodes_fired[i]->staged = false;
-                        }
-                        //float weight = ((1 / (distance)) * nodes_fired[i]->s);
-
-                        // Calculate the gradient vector component-wise
-                        
-                    }
+                    out->x -= learning_rate * grad * (out->x - prev->x);
+                    out->y -= learning_rate * grad * (out->y - prev->y);
+                    out->z -= learning_rate * grad * (out->z - prev->z);
                 }
-                back_prop_iteration += 1;
-                nodes_fired.clear();
+
+                out->fired = false;
+                out->staged = false;
             }
-            
+
+            nodes_fired.clear();
+            back_prop_iteration += 1;
+
             if(back_prop_iteration % 40 == 0)
             {
-                cout << "loss: " << loss << "\n";
+                std::cout << "loss: " << loss << "\n";
                 vs.save();
             }
+
             vs.re_map();
+
             if(back_prop_iteration % 100 == 0)
             {
-                cout << "loss: " << loss << "\n";
+                std::cout << "loss: " << loss << "\n";
                 vs.prune();
             }
         }

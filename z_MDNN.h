@@ -70,6 +70,10 @@ class MDNN
         {
             return vs.filename;
         }
+        void set_learning_rate(float lr)
+        {
+            learning_rate = lr;
+        }
         void reset()
         {
             output_nodes.clear();

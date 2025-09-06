@@ -35,16 +35,12 @@ class run
         try
         {
             cout << "Testing...\n";
-            MNISTImageReader reader("train-images.idx3-ubyte");
+            MNISTImageReader reader("t10k-images.idx3-ubyte");
             const auto &images = reader.getImages();
-            MNISTLabelReader reader_1("train-labels.idx1-ubyte");
+            MNISTLabelReader reader_1("t10k-labels.idx1-ubyte");
             auto one_hot_labels = reader_1.getOneHotLabels();
-            for(int i = images_start; i < images.size(); i ++)
+            for(int i = images_start; i < images_start + images_count && i < (int)images.size(); ++i)
             {
-                if(i == images_count)
-                {
-                    break;
-                }
                 cout << "------------image " << i << " -----------------\n" ;
                 auto ret = nn->cascade(images[i].pixels);
                 cout << "Network Guess \n";
@@ -53,9 +49,6 @@ class run
                 print_output(one_hot_labels[i]);
                 cout << "------------------------\n";
                 nn->reset();
-                cout << "Enter anything to continue... \n";
-                string in;
-                cin >> in; 
             }
         }
         catch (const std::exception &e)

@@ -149,7 +149,7 @@ void showHelp(const vector<string>& args)
              << "  -k               Number of population winners to keep per generation\n"
              << "  -i               Number of images to train on per generation\n"
              << "  -n               Network file to load/save for backpropagation\n"
-             << "  --backpropagation  Use backpropagation instead of genetic algorithm\n"
+             << "  --backpropagation  Use backpropagation instead of the genetic algorithm\n"
              << "  --standard  use standard for dev and save time\n";
     }
     else if (args[1] == "vectors")

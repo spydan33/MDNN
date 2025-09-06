@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <algorithm>
 
 using namespace std;
 
@@ -147,7 +148,8 @@ void showHelp(const vector<string>& args)
              << "  -d               URL or path to training data\n"
              << "  -k               Number of population winners to keep per generation\n"
              << "  -i               Number of images to train on per generation\n"
-             << "  --backpropagation  Use backpropagation instead of genetic algorithm (future feature)\n"
+             << "  -n               Network file to load/save for backpropagation\n"
+             << "  --backpropagation  Use backpropagation instead of genetic algorithm\n"
              << "  --standard  use standard for dev and save time\n";
     }
     else if (args[1] == "vectors")
@@ -272,6 +274,7 @@ void handleTrain(const vector<string>& args)
 
     string data_url = "";
     bool use_backpropagation = false;
+    string network_file = "";
 
     for (size_t i = 1; i < args.size(); ++i)
     {
@@ -299,9 +302,13 @@ void handleTrain(const vector<string>& args)
         {
             trainer.itteration_per_population = stoi(args[++i]);
         }
+        else if (args[i] == "-n" && i + 1 < args.size())
+        {
+            network_file = args[++i];
+        }
         else if (args[i] == "--backpropagation")
         {
-            use_backpropagation = true; //not used, same as above
+            use_backpropagation = true;
         }
         else if (args[i] == "--standard")
         {
@@ -326,7 +333,30 @@ void handleTrain(const vector<string>& args)
     // Call your training logic here
     if (use_backpropagation)
     {
-        cout << "Backpropagation is not yet implemented. Falling back to genetic algorithm.\n";
+        MDNN nn = network_file.empty() ? MDNN(1000, "backprop_vectorspace", 0) : MDNN(network_file);
+        try
+        {
+            MNISTImageReader image_reader("train-images.idx3-ubyte");
+            const auto &images = image_reader.getImages();
+            MNISTLabelReader label_reader("train-labels.idx1-ubyte");
+            auto one_hot_labels = label_reader.getOneHotLabels();
+            int limit = min<int>(trainer.itteration_per_population, images.size());
+            for (int i = 0; i < limit; ++i)
+            {
+                nn.cascade(images[i].pixels);
+                nn.back_propagation(one_hot_labels[i]);
+                nn.reset();
+            }
+            nn.save();
+            cout << "Backpropagation training complete.\n";
+        }
+        catch(const std::exception& e)
+        {
+            cout << "An error occurred: " << e.what() << "\n";
+        }
     }
-    trainer.run();
+    else
+    {
+        trainer.run();
+    }
 }
